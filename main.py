@@ -18,9 +18,7 @@ from telethon.errors import (
     ChannelPrivateError,
     SlowModeWaitError,
     ChatAdminRequiredError,
-    UserDeactivatedBanError,
     ChatRestrictedError,
-    ChannelInvalidError,
     PeerFloodError
 )
 from telethon.tl.functions.channels import JoinChannelRequest, GetFullChannelRequest
@@ -58,7 +56,7 @@ def save_data():
         json.dump(user_data, f, ensure_ascii=False, indent=2)
 
 load_data()
-app = FastAPI(title="Bot API v3.0", version="3.0")
+app = FastAPI(title="Bot API", version="3.0")
 
 def check_auth(key: str):
     if key != SECRET_KEY:
@@ -75,7 +73,7 @@ async def root():
         "reset_tasks": len(reset_tasks)
     }
 
-# ========== TABCHI SEND CODE ==========
+# ========== TABCHI - SEND CODE ==========
 class SendCodeReq(BaseModel):
     key: str
     user_id: int
@@ -99,27 +97,25 @@ async def send_code(req: SendCodeReq):
             "interval": 5,
             "groups": [],
             "groups_data": [],
-            "group_names": [],
-            "delay_min": 8,
-            "delay_max": 20
+            "group_names": []
         }
         save_data()
         await client.disconnect()
         return {"ok": True, "message": "کد ارسال شد"}
     except PhoneNumberInvalidError:
-        await client.disconnect()
+        try: await client.disconnect()
+        except: pass
         return {"ok": False, "error": "شماره نامعتبر"}
     except FloodWaitError as e:
-        await client.disconnect()
+        try: await client.disconnect()
+        except: pass
         return {"ok": False, "error": f"صبر کنید {e.seconds} ثانیه"}
     except Exception as e:
-        try:
-            await client.disconnect()
-        except:
-            pass
+        try: await client.disconnect()
+        except: pass
         return {"ok": False, "error": str(e)}
 
-# ========== TABCHI VERIFY CODE ==========
+# ========== TABCHI - VERIFY CODE ==========
 class VerifyCodeReq(BaseModel):
     key: str
     user_id: int
@@ -158,13 +154,11 @@ async def verify_code(req: VerifyCodeReq):
         await client.disconnect()
         return {"ok": True, "message": f"وارد شدید: {me.first_name}", "name": me.first_name}
     except Exception as e:
-        try:
-            await client.disconnect()
-        except:
-            pass
+        try: await client.disconnect()
+        except: pass
         return {"ok": False, "error": str(e)}
 
-# ========== TABCHI SET BANNER ==========
+# ========== TABCHI - SET BANNER ==========
 class SetBannerReq(BaseModel):
     key: str
     user_id: int
@@ -180,7 +174,7 @@ async def set_banner(req: SetBannerReq):
     save_data()
     return {"ok": True, "message": "بنر ذخیره شد"}
 
-# ========== TABCHI SET INTERVAL ==========
+# ========== TABCHI - SET INTERVAL ==========
 class SetIntervalReq(BaseModel):
     key: str
     user_id: int
@@ -196,7 +190,7 @@ async def set_interval(req: SetIntervalReq):
     save_data()
     return {"ok": True, "message": f"زمان {req.interval} دقیقه تنظیم شد"}
 
-# ========== TABCHI JOIN GROUPS ==========
+# ========== TABCHI - JOIN GROUPS ==========
 class JoinGroupsReq(BaseModel):
     key: str
     user_id: int
@@ -211,11 +205,9 @@ async def join_groups(req: JoinGroupsReq):
         if not await client.is_user_authorized():
             await client.disconnect()
             return {"ok": False, "error": "ابتدا وارد شوید"}
-        
         my_groups = []
         can_send = []
         cannot_send = []
-        
         async for dialog in client.iter_dialogs():
             entity = dialog.entity
             group_info = None
@@ -225,29 +217,16 @@ async def join_groups(req: JoinGroupsReq):
                     default_banned = getattr(entity, 'default_banned_rights', None)
                     if default_banned and default_banned.send_messages:
                         is_banned = True
-                    group_info = {
-                        "id": entity.id,
-                        "title": entity.title,
-                        "username": entity.username,
-                        "type": "supergroup",
-                        "can_send": not is_banned
-                    }
+                    group_info = {"id": entity.id, "title": entity.title, "username": entity.username, "type": "supergroup", "can_send": not is_banned}
             elif isinstance(entity, Chat):
                 if not getattr(entity, 'deactivated', False):
-                    group_info = {
-                        "id": entity.id,
-                        "title": entity.title,
-                        "username": None,
-                        "type": "chat",
-                        "can_send": True
-                    }
+                    group_info = {"id": entity.id, "title": entity.title, "username": None, "type": "chat", "can_send": True}
             if group_info:
                 my_groups.append(group_info)
                 if group_info["can_send"]:
                     can_send.append(group_info)
                 else:
                     cannot_send.append(group_info)
-        
         uid = str(req.user_id)
         if uid not in user_data:
             user_data[uid] = {}
@@ -255,25 +234,14 @@ async def join_groups(req: JoinGroupsReq):
         user_data[uid]["groups"] = [g["id"] for g in my_groups if g["can_send"]]
         user_data[uid]["group_names"] = [g["title"] for g in my_groups]
         save_data()
-        
         await client.disconnect()
-        print(f"User {req.user_id}: found {len(my_groups)}, can_send={len(can_send)}")
-        return {
-            "ok": True,
-            "joined": len(my_groups),
-            "can_send": len(can_send),
-            "cannot_send": len(cannot_send),
-            "failed": 0,
-            "groups": [g["title"] for g in my_groups[:20]]
-        }
+        return {"ok": True, "joined": len(my_groups), "can_send": len(can_send), "cannot_send": len(cannot_send), "failed": 0, "groups": [g["title"] for g in my_groups[:20]]}
     except Exception as e:
-        try:
-            await client.disconnect()
-        except:
-            pass
+        try: await client.disconnect()
+        except: pass
         return {"ok": False, "error": str(e)}
 
-# ========== AUTO JOIN ==========
+# ========== AUTO JOIN HELPERS ==========
 def extract_channels_from_text(text):
     if not text:
         return []
@@ -291,7 +259,7 @@ async def try_auto_join(client, error_msg):
     joined = []
     for ch in channels[:5]:
         try:
-            if len(ch) > 15 and not ch.replace('_', '').replace('-', '').isalnum():
+            if len(ch) > 15:
                 try:
                     await client(ImportChatInviteRequest(ch))
                     joined.append(ch)
@@ -309,7 +277,6 @@ async def try_auto_join(client, error_msg):
             pass
     return joined
 
-# ========== SEND TO GROUP ==========
 async def send_to_group(client, group_id, banner):
     try:
         entity = await client.get_entity(group_id)
@@ -343,7 +310,7 @@ async def send_to_group(client, group_id, banner):
                     await client.send_message(entity, banner)
                     return {"success": True, "auto_joined": auto_joined}
                 except Exception as e2:
-                    return {"success": False, "auto_joined": auto_joined, "error": f"بعد جوین: {str(e2)[:80]}"}
+                    return {"success": False, "auto_joined": auto_joined, "error": str(e2)[:80]}
             return {"success": False, "auto_joined": [], "error": "فقط ادمین حق ارسال داره"}
         except Exception as ee:
             return {"success": False, "auto_joined": [], "error": str(ee)[:100]}
@@ -386,9 +353,9 @@ async def send_loop(user_id: int):
             all_auto_joined = []
             errors = []
             critical_stop = False
-            shuffled_groups = groups.copy()
-            random.shuffle(shuffled_groups)
-            for idx, grp in enumerate(shuffled_groups):
+            shuffled = groups.copy()
+            random.shuffle(shuffled)
+            for grp in shuffled:
                 if user_id not in running_tasks:
                     break
                 result = await send_to_group(client, grp, banner)
@@ -396,8 +363,7 @@ async def send_loop(user_id: int):
                     sent += 1
                 else:
                     failed += 1
-                    err = result.get("error", "?")
-                    errors.append({"group": str(grp), "error": err})
+                    errors.append({"group": str(grp), "error": result.get("error", "?")})
                     if result.get("critical"):
                         critical_stop = True
                         break
@@ -406,18 +372,16 @@ async def send_loop(user_id: int):
                 if result.get("wait"):
                     await asyncio.sleep(min(result["wait"] + 5, 120))
                 else:
-                    delay = random.uniform(8, 20)
-                    await asyncio.sleep(delay)
+                    await asyncio.sleep(random.uniform(8, 20))
             stats_data[uid] = {
                 "last_run": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "sent": sent,
-                "failed": failed,
+                "sent": sent, "failed": failed,
                 "auto_joined": all_auto_joined,
                 "errors": errors[:15],
                 "total_groups": len(groups),
                 "critical_stop": critical_stop
             }
-            print(f"📊 User {user_id}: sent={sent}, failed={failed}")
+            print(f"📊 {user_id}: sent={sent}, failed={failed}")
             if critical_stop:
                 await asyncio.sleep(1800)
             elif user_id in running_tasks:
@@ -427,12 +391,10 @@ async def send_loop(user_id: int):
     finally:
         if user_id in active_clients:
             del active_clients[user_id]
-        try:
-            await client.disconnect()
-        except:
-            pass
+        try: await client.disconnect()
+        except: pass
 
-# ========== START/STOP TABCHI ==========
+# ========== START/STOP/STATUS/LOGOUT ==========
 class StartReq(BaseModel):
     key: str
     user_id: int
@@ -450,9 +412,7 @@ async def start(req: StartReq):
 async def stop(req: StartReq):
     check_auth(req.key)
     if req.user_id in running_tasks:
-        task = running_tasks[req.user_id]
         del running_tasks[req.user_id]
-        task.cancel()
         return {"ok": True, "message": "متوقف شد"}
     return {"ok": False, "error": "در حال اجرا نبود"}
 
@@ -474,7 +434,6 @@ async def status(req: StartReq):
         "last_failed": stats.get("failed", 0),
         "total_groups": stats.get("total_groups", 0),
         "auto_joined_count": len(stats.get("auto_joined", [])),
-        "auto_joined": stats.get("auto_joined", [])[:10],
         "errors": stats.get("errors", [])[:8],
         "last_run": stats.get("last_run", "-"),
         "critical_stop": stats.get("critical_stop", False)
@@ -484,9 +443,7 @@ async def status(req: StartReq):
 async def logout(req: StartReq):
     check_auth(req.key)
     if req.user_id in running_tasks:
-        task = running_tasks[req.user_id]
         del running_tasks[req.user_id]
-        task.cancel()
     session_path = os.path.join(SESSIONS_DIR, f"{req.user_id}.session")
     if os.path.exists(session_path):
         os.remove(session_path)
@@ -494,8 +451,6 @@ async def logout(req: StartReq):
     if uid in user_data:
         del user_data[uid]
         save_data()
-    if uid in stats_data:
-        del stats_data[uid]
     return {"ok": True, "message": "خروج انجام شد"}
 
 # ========== BROADCAST ==========
@@ -511,27 +466,27 @@ class BroadcastReq(BaseModel):
     voice_id: str = ""
     caption: str = ""
 
-async def send_one_broadcast(session, bot_token, uid, msg_data):
+async def send_one_bc(session, bot_token, uid, msg):
     try:
         uid = int(uid)
-        if msg_data.get("text"):
+        if msg.get("text"):
             url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-            payload = {"chat_id": uid, "text": msg_data["text"]}
-        elif msg_data.get("photo_id"):
+            payload = {"chat_id": uid, "text": msg["text"]}
+        elif msg.get("photo_id"):
             url = f"https://api.telegram.org/bot{bot_token}/sendPhoto"
-            payload = {"chat_id": uid, "photo": msg_data["photo_id"], "caption": msg_data.get("caption", "")}
-        elif msg_data.get("video_id"):
+            payload = {"chat_id": uid, "photo": msg["photo_id"], "caption": msg.get("caption", "")}
+        elif msg.get("video_id"):
             url = f"https://api.telegram.org/bot{bot_token}/sendVideo"
-            payload = {"chat_id": uid, "video": msg_data["video_id"], "caption": msg_data.get("caption", "")}
-        elif msg_data.get("doc_id"):
+            payload = {"chat_id": uid, "video": msg["video_id"], "caption": msg.get("caption", "")}
+        elif msg.get("doc_id"):
             url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
-            payload = {"chat_id": uid, "document": msg_data["doc_id"], "caption": msg_data.get("caption", "")}
-        elif msg_data.get("sticker_id"):
+            payload = {"chat_id": uid, "document": msg["doc_id"], "caption": msg.get("caption", "")}
+        elif msg.get("sticker_id"):
             url = f"https://api.telegram.org/bot{bot_token}/sendSticker"
-            payload = {"chat_id": uid, "sticker": msg_data["sticker_id"]}
-        elif msg_data.get("voice_id"):
+            payload = {"chat_id": uid, "sticker": msg["sticker_id"]}
+        elif msg.get("voice_id"):
             url = f"https://api.telegram.org/bot{bot_token}/sendVoice"
-            payload = {"chat_id": uid, "voice": msg_data["voice_id"]}
+            payload = {"chat_id": uid, "voice": msg["voice_id"]}
         else:
             return False
         async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=10)) as resp:
@@ -540,48 +495,35 @@ async def send_one_broadcast(session, bot_token, uid, msg_data):
     except:
         return False
 
-async def do_broadcast_task(bot_token, user_ids, msg_data, task_id):
+async def do_bc_task(bot_token, user_ids, msg, task_id):
     ok = 0
     fail = 0
     total = len(user_ids)
-    broadcast_tasks[task_id] = {"total": total, "ok": 0, "fail": 0, "done": False, "started": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-    print(f"📨 Broadcast {task_id} started: {total} users")
+    broadcast_tasks[task_id] = {"total": total, "ok": 0, "fail": 0, "done": False}
+    print(f"📨 BC {task_id}: {total} users")
     connector = aiohttp.TCPConnector(limit=50)
     async with aiohttp.ClientSession(connector=connector) as session:
         for i in range(0, total, 30):
             batch = user_ids[i:i+30]
-            tasks = [send_one_broadcast(session, bot_token, uid, msg_data) for uid in batch]
+            tasks = [send_one_bc(session, bot_token, uid, msg) for uid in batch]
             results = await asyncio.gather(*tasks, return_exceptions=True)
             for r in results:
-                if isinstance(r, Exception):
-                    fail += 1
-                elif r is True:
+                if r is True:
                     ok += 1
                 else:
                     fail += 1
             broadcast_tasks[task_id]["ok"] = ok
             broadcast_tasks[task_id]["fail"] = fail
-            if (i + 30) % 300 == 0 or (i + 30) >= total:
-                print(f"📨 {task_id}: {ok+fail}/{total}")
             await asyncio.sleep(1)
     broadcast_tasks[task_id]["done"] = True
-    broadcast_tasks[task_id]["finished"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"✅ Broadcast {task_id} DONE: ok={ok}, fail={fail}")
+    print(f"✅ BC {task_id}: ok={ok}, fail={fail}")
 
 @app.post("/broadcast")
 async def broadcast(req: BroadcastReq):
     check_auth(req.key)
     task_id = f"bc_{int(datetime.now().timestamp())}"
-    msg_data = {
-        "text": req.text,
-        "photo_id": req.photo_id,
-        "video_id": req.video_id,
-        "doc_id": req.doc_id,
-        "sticker_id": req.sticker_id,
-        "voice_id": req.voice_id,
-        "caption": req.caption
-    }
-    asyncio.create_task(do_broadcast_task(req.bot_token, req.user_ids, msg_data, task_id))
+    msg = {"text": req.text, "photo_id": req.photo_id, "video_id": req.video_id, "doc_id": req.doc_id, "sticker_id": req.sticker_id, "voice_id": req.voice_id, "caption": req.caption}
+    asyncio.create_task(do_bc_task(req.bot_token, req.user_ids, msg, task_id))
     return {"ok": True, "task_id": task_id, "total": len(req.user_ids)}
 
 class BCStatusReq(BaseModel):
@@ -589,78 +531,50 @@ class BCStatusReq(BaseModel):
     task_id: str
 
 @app.post("/broadcast_status")
-async def broadcast_status(req: BCStatusReq):
+async def bc_status(req: BCStatusReq):
     check_auth(req.key)
     if req.task_id in broadcast_tasks:
         return {"ok": True, **broadcast_tasks[req.task_id]}
-    return {"ok": False, "error": "task not found"}
+    return {"ok": False, "error": "not found"}
 
-# ========== RESET USERS (زیرمجموعه و استارز) ==========
+# ========== RESET ALL USERS ==========
 class ResetReq(BaseModel):
     key: str
     bot_token: str
     user_ids: list
-    reset_refs: bool = True
-    reset_stars: bool = True
 
-async def do_reset_task(bot_token, user_ids, reset_refs, reset_stars, task_id):
-    """صفر کردن زیرمجموعه/استارز از طریق Telegram Bot API با کمک KV"""
-    # این تابع فقط برای notification استفاده میشه
-    # صفر کردن واقعی باید توسط Cloudflare Worker انجام بشه
-    # ما فقط progress رو track میکنیم
+async def do_reset_task(bot_token, user_ids, task_id):
     total = len(user_ids)
-    reset_tasks[task_id] = {
-        "total": total,
-        "done": 0,
-        "status": "running",
-        "started": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-    # Notification به کاربران
-    ok = 0
-    fail = 0
+    reset_tasks[task_id] = {"total": total, "done": 0, "status": "running"}
+    print(f"🔄 Reset {task_id}: {total} users")
+    
     connector = aiohttp.TCPConnector(limit=30)
     async with aiohttp.ClientSession(connector=connector) as session:
-        for i in range(0, total, 25):
-            batch = user_ids[i:i+25]
+        done = 0
+        for i in range(0, total, 50):
+            batch = user_ids[i:i+50]
             tasks = []
             for uid in batch:
                 try:
                     uid = int(uid)
+                    # KV رو از Cloudflare Worker صفر میکنیم
                     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-                    payload = {
-                        "chat_id": uid,
-                        "text": "🔄 اطلاع مهم!\n\nموجودی زیرمجموعه و استارز شما توسط مدیریت صفر شد.\nبرای اطلاعات بیشتر با پشتیبانی تماس بگیرید."
-                    }
-                    tasks.append(session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=5)))
+                    # فقط track میکنیم
+                    done += 1
                 except:
                     pass
-            if tasks:
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-                for r in results:
-                    if isinstance(r, Exception):
-                        fail += 1
-                    else:
-                        try:
-                            data = await r.json()
-                            if data.get("ok"):
-                                ok += 1
-                            else:
-                                fail += 1
-                        except:
-                            fail += 1
-            reset_tasks[task_id]["done"] = ok + fail
-            await asyncio.sleep(1)
+            reset_tasks[task_id]["done"] = done
+            await asyncio.sleep(0.5)
+    
     reset_tasks[task_id]["status"] = "done"
-    reset_tasks[task_id]["ok"] = ok
-    reset_tasks[task_id]["fail"] = fail
-    reset_tasks[task_id]["finished"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"✅ Reset notification {task_id} DONE: ok={ok}, fail={fail}")
+    reset_tasks[task_id]["done"] = done
+    print(f"✅ Reset {task_id}: {done} tracked")
 
-@app.post("/notify_reset")
-async def notify_reset(req: ResetReq):
+@app.post("/reset_users")
+async def reset_users(req: ResetReq):
     check_auth(req.key)
     task_id = f"rst_{int(datetime.now().timestamp())}"
-    asyncio.create_task(do_reset_task(req.bot_token, req.user_ids, req.reset_refs, req.reset_stars, task_id))
+    asyncio.create_task(do_reset_task(req.bot_token, req.user_ids, task_id))
     return {"ok": True, "task_id": task_id, "total": len(req.user_ids)}
 
 @app.post("/reset_status")
@@ -668,7 +582,7 @@ async def reset_status(req: BCStatusReq):
     check_auth(req.key)
     if req.task_id in reset_tasks:
         return {"ok": True, **reset_tasks[req.task_id]}
-    return {"ok": False, "error": "task not found"}
+    return {"ok": False, "error": "not found"}
 
 # ========== HEALTH ==========
 @app.get("/health")
@@ -678,6 +592,6 @@ async def health():
         "time": datetime.now().isoformat(),
         "active_clients": len(active_clients),
         "running_tasks": len(running_tasks),
-        "broadcast_tasks": {k: {"done": v.get("done", False), "ok": v.get("ok", 0), "fail": v.get("fail", 0)} for k, v in broadcast_tasks.items()},
-        "reset_tasks": {k: {"status": v.get("status"), "done": v.get("done", 0), "total": v.get("total", 0)} for k, v in reset_tasks.items()}
+        "broadcast_tasks": len(broadcast_tasks),
+        "reset_tasks": len(reset_tasks)
     }

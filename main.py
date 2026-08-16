@@ -824,7 +824,7 @@ async def on_cb(q):
             return
 
         # سفارش انجام شد
-        if d.startswith("ODONE:") and uid == ADMIN:
+         if d.startswith("ODONE:") and uid == ADMIN:
             try:
                 track = d[6:]
                 order = await get_order(track)
@@ -834,6 +834,25 @@ async def on_cb(q):
                 if order["status"] == "done":
                     await tg("answerCallbackQuery", {"callback_query_id": q["id"], "text": "⚠️ قبلاً انجام شده!", "show_alert": True})
                     return
+                await done_order(track)
+                order_uid = int(order["uid"])
+                r = await tg("sendMessage", {
+                    "chat_id": order_uid,
+                    "text": f"🎊 تبریک! سفارش شما آماده شد!\n{L2}\n\n✅ پنل VPN شما فعال شد!\n\n🔢 کد: <code>{track}</code>\n📦 {order['plan_name']}\n📊 {order['plan_size']}\n\n💡 اطلاعات اتصال به زودی ارسال می‌شود.\n\n🌹 متشکریم!",
+                    "parse_mode": "HTML"
+                })
+                try:
+                    await tg("editMessageReplyMarkup", {"chat_id": cid, "message_id": mid, "reply_markup": J({"inline_keyboard": [[{"text": "✅ انجام شده ✓", "callback_data": "DONE"}]]})})
+                except:
+                    pass
+                await set_st(uid, f"RP:{order_uid}")
+                if r and r.get("ok"):
+                    await tg("sendMessage", {"chat_id": cid, "text": f"✅ پیام به کاربر ارسال شد.\n\n💡 الان اطلاعات پنل رو بفرستید:\n👤 کاربر: <code>{order_uid}</code>\n\n📝 پیام/فایل/عکس بفرستید:\n⚠️ لغو: «❌ لغو»", "parse_mode": "HTML", "reply_markup": J({"keyboard": [[{"text": "❌ لغو"}]], "resize_keyboard": True})})
+                else:
+                    await tg("answerCallbackQuery", {"callback_query_id": q["id"], "text": "⚠️ ثبت شد ولی ارسال ناموفق", "show_alert": True})
+            except Exception as e:
+                await tg("answerCallbackQuery", {"callback_query_id": q["id"], "text": f"❌ {str(e)[:50]}", "show_alert": True})
+            return
 
                 await done_order(track)
 

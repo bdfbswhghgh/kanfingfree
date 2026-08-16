@@ -139,9 +139,12 @@ def gen_track():
 
 def progress_bar(cur, total, length=10):
     if total == 0:
-        return "░" * length + " 0%"
+        return "░░░░░░░░░░ 0%"
     filled = int(length * cur / total)
-    return "█" * filled + "░" * (length - filled) + f" {round(cur / total * 100)}%"
+    pct = round(cur / total * 100)
+    return "█" * filled + "░" * (length - filled) + " " + str(pct) + "%"
+
+
 async def get_user(uid):
     async with db.acquire() as c:
         r = await c.fetchrow("SELECT * FROM users WHERE uid=$1", uid)

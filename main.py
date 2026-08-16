@@ -822,18 +822,6 @@ async def on_cb(q):
 
             await log_order({"track": track, "plan_name": plan["name"], "plan_size": plan["size"]})
             return
-
-        # سفارش انجام شد
-         if d.startswith("ODONE:") and uid == ADMIN:
-            try:
-                track = d[6:]
-                order = await get_order(track)
-                if not order:
-                    await tg("answerCallbackQuery", {"callback_query_id": q["id"], "text": "❌ یافت نشد!", "show_alert": True})
-                    return
-                if order["status"] == "done":
-                    await tg("answerCallbackQuery", {"callback_query_id": q["id"], "text": "⚠️ قبلاً انجام شده!", "show_alert": True})
-                    return
                 await done_order(track)
                 order_uid = int(order["uid"])
                 r = await tg("sendMessage", {

@@ -141,7 +141,10 @@ def progress_bar(cur, total, length=10):
     if total == 0:
         return "░" * length + " 0%"
     filled = int(length * cur / total)
-    return "█" * filled + "░" * (length - filled) + f" {round(cur / total * 100)}%"async def get_user(uid):
+        return "█" * filled + "░" * (length - filled) + f" {round(cur / total * 100)}%"
+
+
+async def get_user(uid):
     async with db.acquire() as c:
         r = await c.fetchrow("SELECT * FROM users WHERE uid=$1", uid)
         return dict(r) if r else None

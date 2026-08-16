@@ -141,7 +141,7 @@ def progress_bar(cur, total, length=10):
     if total == 0:
         return "░" * length + " 0%"
     filled = int(length * cur / total)
-        return "█" * filled + "░" * (length - filled) + f" {round(cur / total * 100)}%"
+    return "█" * filled + "░" * (length - filled) + f" {round(cur / total * 100)}%"
 
 
 async def get_user(uid):

@@ -137,11 +137,10 @@ def gen_track():
     return "ORD-" + "".join(random.choices("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", k=7))
 
 
-def progress_bar(cur, total, length=10):
+def progress_bar(cur, total):
     if total == 0:
         return "0%"
-pct = round(cur / total * 100)
-return str(pct) + "%"
+    return str(round(cur * 100 / total)) + "%"
 
 
 async def get_user(uid):

@@ -139,10 +139,12 @@ def gen_track():
 
 def progress_bar(cur, total, length=10):
     if total == 0:
-        return "░░░░░░░░░░ 0%"
-    filled = int(length * cur / total)
-    pct = round(cur / total * 100)
-    return "█" * filled + "░" * (length - filled) + " " + str(pct) + "%"
+        return "0%"
+pct = round(cur / total * 100)
+return str(pct) + "%"
+
+
+async def get_user(uid):
 
 
 async def get_user(uid):

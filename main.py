@@ -133,8 +133,8 @@ def captcha():
     return f"{big} - {small}", big - small
 
 
-def gen_track():
-    return "ORD-" + "".join(random.choices("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", k=7))
+def progress_bar(cur, total):
+    return "0%" if total == 0 else str(round(cur * 100 / total)) + "%"
 
 
 def progress_bar(cur, total):
